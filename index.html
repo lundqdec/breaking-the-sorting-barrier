@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breaking the Sorting Barrier — Algorithm Visualization</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Domine:wght@400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --text: #e0dfe6;
+    --muted: #6b6b80;
+    --dijkstra: #f59e0b;
+    --dijkstra-glow: rgba(245, 158, 11, 0.3);
+    --bellman: #06b6d4;
+    --bellman-glow: rgba(6, 182, 212, 0.3);
+    --hybrid: #a855f7;
+    --hybrid-glow: rgba(168, 85, 247, 0.35);
+    --complete: #22c55e;
+    --incomplete: #ef4444;
+    --edge: #2a2a3e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Domine', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise {
+    position: fixed;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  header {
+    text-align: center;
+    padding: 3rem 2rem 1.5rem;
+    position: relative;
+  }
+
+  header h1 {
+    font-family: 'Domine', serif;
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--dijkstra), var(--hybrid), var(--bellman));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 2rem 4rem;
+  }
+
+  /* Phase selector */
+  .phase-nav {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+  }
+
+  .phase-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.6rem 1.2rem;
+    font-family: 'Domine', serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+  }
+
+  .phase-btn:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  .phase-btn.active[data-phase="dijkstra"] {
+    border-color: var(--dijkstra);
+    color: var(--dijkstra);
+    box-shadow: 0 0 20px var(--dijkstra-glow);
+  }
+
+  .phase-btn.active[data-phase="bellman"] {
+    border-color: var(--bellman);
+    color: var(--bellman);
+    box-shadow: 0 0 20px var(--bellman-glow);
+  }
+
+  .phase-btn.active[data-phase="hybrid"] {
+    border-color: var(--hybrid);
+    color: var(--hybrid);
+    box-shadow: 0 0 20px var(--hybrid-glow);
+  }
+
+  /* Main layout */
+  .viz-grid {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  @media (max-width: 800px) {
+    .viz-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Canvas area */
+  .canvas-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .canvas-label {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Info panel */
+  .info-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1.2rem;
+  }
+
+  .info-card h3 {
+    font-family: 'Domine', serif;
+    font-weight: 400;
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    letter-spacing: -0.01em;
+  }
+
+  .info-card p, .info-card li {
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .info-card .highlight {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .info-card ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .info-card li::before {
+    content: '→ ';
+    opacity: 0.4;
+  }
+
+  /* Complexity bar */
+  .complexity-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+  }
+
+  .complexity-bar .bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .complexity-bar .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  .complexity-bar .label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    min-width: 90px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  /* Step control */
+  .step-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+
+  .step-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .step-btn:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  .step-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    min-width: 80px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Transition for phase switching */
+  .fade-enter {
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Tooltip popup styles */
+  .tooltip-trigger {
+    color: var(--bellman);
+    border-bottom: 1px dashed var(--bellman);
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s;
+  }
+
+  .tooltip-trigger:hover {
+    color: #fff;
+  }
+
+  .tooltip-popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--surface);
+    border: 1px solid var(--bellman);
+    border-radius: 4px;
+    padding: 1.5rem;
+    max-width: 420px;
+    width: 90vw;
+    z-index: 1000;
+    box-shadow: 0 0 40px rgba(6, 182, 212, 0.15), 0 20px 60px rgba(0,0,0,0.5);
+    animation: popIn 0.25s ease;
+  }
+
+  .tooltip-popup.visible {
+    display: block;
+  }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  .tooltip-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 999;
+    backdrop-filter: blur(3px);
+  }
+
+  .tooltip-overlay.visible {
+    display: block;
+  }
+
+  .tooltip-popup h4 {
+    font-family: 'Domine', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: var(--bellman);
+    margin-bottom: 0.8rem;
+  }
+
+  .tooltip-popup p {
+    font-size: 0.72rem;
+    line-height: 1.8;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .tooltip-popup .analogy {
+    background: rgba(6, 182, 212, 0.08);
+    border-left: 2px solid var(--bellman);
+    padding: 0.8rem 1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .tooltip-popup .analogy p {
+    color: var(--text);
+    margin: 0;
+  }
+
+  .tooltip-close {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.8rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+  }
+
+  .tooltip-close:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  /* Applications section */
+  .applications-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 2rem 5rem;
+  }
+
+  .applications-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .applications-header h2 {
+    font-family: 'Domine', serif;
+    font-weight: 400;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+  }
+
+  .applications-header p {
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+
+  .app-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1.3rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .app-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-color, var(--hybrid)), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .app-card:hover {
+    border-color: var(--muted);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+
+  .app-card:hover::before {
+    opacity: 1;
+  }
+
+  .app-icon {
+    font-size: 1.4rem;
+    margin-bottom: 0.7rem;
+    display: block;
+  }
+
+  .app-card h3 {
+    font-family: 'Domine', serif;
+    font-weight: 400;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+  }
+
+  .app-card p {
+    font-size: 0.68rem;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .app-tag {
+    display: inline-block;
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    margin-top: 0.7rem;
+    border: 1px solid;
+  }
+
+  .tag-high { color: var(--hybrid); border-color: rgba(168,85,247,0.3); background: rgba(168,85,247,0.08); }
+  .tag-medium { color: var(--dijkstra); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+  .tag-emerging { color: var(--bellman); border-color: rgba(6,182,212,0.3); background: rgba(6,182,212,0.08); }
+
+  .divider {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .divider hr {
+    border: none;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<header>
+  <h1>Breaking the Sorting Barrier</h1>
+  <p>Duan, Mao, Mao, Shu, Yin — 2025 · How Dijkstra & Bellman-Ford merged</p>
+</header>
+
+<div class="container">
+  <div class="phase-nav">
+    <button class="phase-btn active" data-phase="dijkstra">① Dijkstra</button>
+    <button class="phase-btn" data-phase="bellman">② Bellman-Ford</button>
+    <button class="phase-btn" data-phase="hybrid">③ The Breakthrough</button>
+  </div>
+
+  <div class="viz-grid">
+    <div>
+      <div class="canvas-wrap">
+        <canvas id="graphCanvas"></canvas>
+        <div class="canvas-label" id="canvasLabel">DIJKSTRA — PRIORITY QUEUE EXTRACTION</div>
+      </div>
+      <div class="step-controls">
+        <button class="step-btn" id="resetBtn">↺</button>
+        <button class="step-btn" id="prevBtn">‹</button>
+        <div class="step-label" id="stepLabel">Step 0 / 0</div>
+        <button class="step-btn" id="nextBtn">›</button>
+        <button class="step-btn" id="playBtn">▶</button>
+      </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+      <!-- Dynamic content -->
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip popup for BF as coarse filter -->
+<div class="tooltip-overlay" id="tooltipOverlay"></div>
+<div class="tooltip-popup" id="tooltipBF">
+  <button class="tooltip-close" id="tooltipClose">✕</button>
+  <h4>Bellman-Ford as a "Coarse Filter"</h4>
+  <p>Dijkstra's algorithm is precise — it finds the single closest vertex, processes it, then finds the next closest. This precision requires <span style="color:var(--dijkstra)">constantly sorting</span>, which is expensive.</p>
+  <p>Bellman-Ford takes a different approach: it doesn't care about order at all. It just sweeps through <span style="color:var(--bellman)">every connection</span> in the network, updating distances. After k sweeps, anything reachable within k steps is done — no sorting needed.</p>
+  <div class="analogy">
+    <p>☕ <strong>Coffee shop analogy:</strong> Imagine 100 people in line. Dijkstra carefully checks everyone's ticket number to find who's next — every single time. Bellman-Ford just shouts "anyone with ticket 1–10, step forward!" — rough but fast. The breakthrough: use the shout to clear the easy cases, then only carefully sort the few remaining people.</p>
+  </div>
+  <p>The breakthrough uses Bellman-Ford's sweeps to eliminate the "easy" vertices (those close to the frontier), leaving only a small set of <span style="color:var(--hybrid)">pivots</span> that actually need Dijkstra-style precision sorting. This dramatically reduces the sorting workload.</p>
+</div>
+
+<!-- Divider -->
+<div class="divider"><hr></div>
+
+<!-- Applications section -->
+<section class="applications-section">
+  <div class="applications-header">
+    <h2>Real-World Impact</h2>
+    <p>Where breaking the sorting barrier matters most</p>
+  </div>
+
+  <div class="app-grid">
+    <div class="app-card" style="--accent-color: var(--hybrid)">
+      <h3>Unknown Territory Routing</h3>
+      <p>Autonomous vehicles, drones, and military operations in unmapped areas build graphs on-the-fly from sensor data. No precomputation possible — every route is computed from scratch under real-time constraints.</p>
+      <span class="app-tag tag-high">highest impact</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--hybrid)">
+      <h3>Disaster Response</h3>
+      <p>Post-earthquake or flood, the road network is unknown. Directed constraints from debris, one-way detours, and elevation changes create sparse directed graphs that must be solved immediately.</p>
+      <span class="app-tag tag-high">highest impact</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--hybrid)">
+      <h3>Dynamic Network Routing</h3>
+      <p>ISPs, CDNs, and SDN controllers recompute routes when topology changes faster than precomputation allows — outages, congestion shifts, and real-time traffic engineering.</p>
+      <span class="app-tag tag-high">highest impact</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--dijkstra)">
+      <h3>Planetary Exploration</h3>
+      <p>Mars rovers and deep-sea AUVs navigate terrain where the graph is constructed from sensor readings in real-time. Current-dependent underwater paths are inherently directed.</p>
+      <span class="app-tag tag-medium">high impact</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--dijkstra)">
+      <h3>Edge / On-Device Compute</h3>
+      <p>IoT devices and mobile platforms without cloud access need to compute routes locally. Every CPU cycle counts — sub-logarithmic gains compound on constrained hardware.</p>
+      <span class="app-tag tag-medium">high impact</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--dijkstra)">
+      <h3>Supply Chain &amp; Logistics</h3>
+      <p>Real-time rerouting across massive logistics networks when disruptions invalidate precomputed paths. Directed constraints from shipping lanes, customs, and capacity limits.</p>
+      <span class="app-tag tag-medium">high impact</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--bellman)">
+      <h3>Chip Design (EDA)</h3>
+      <p>Timing analysis and signal propagation in circuit layouts model billions of directed edges. Faster SSSP means faster design iterations in electronic design automation.</p>
+      <span class="app-tag tag-emerging">emerging</span>
+    </div>
+
+    <div class="app-card" style="--accent-color: var(--bellman)">
+      <h3>Financial Network Analysis</h3>
+      <p>Fraud detection, counterparty exposure chains, and transaction flow analysis on directed graphs. Ad-hoc queries on massive one-off graphs where precomputation isn't justified.</p>
+      <span class="app-tag tag-emerging">emerging</span>
+    </div>
+  </div>
+</section>
+
+<script>
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+const DPR = window.devicePixelRatio || 1;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * DPR;
+  canvas.height = rect.height * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resize();
+window.addEventListener('resize', () => { resize(); draw(); });
+
+// Graph definition — directed, weighted
+const W = () => canvas.width / DPR;
+const H = () => canvas.height / DPR;
+
+function nodePositions() {
+  const w = W(), h = H();
+  const mx = w * 0.12, my = h * 0.12;
+  return [
+    { id: 0, label: 'S', x: mx, y: h * 0.5 },
+    { id: 1, label: 'A', x: w * 0.28, y: my + h * 0.08 },
+    { id: 2, label: 'B', x: w * 0.28, y: h - my - h * 0.08 },
+    { id: 3, label: 'C', x: w * 0.5, y: h * 0.3 },
+    { id: 4, label: 'D', x: w * 0.5, y: h * 0.7 },
+    { id: 5, label: 'E', x: w * 0.7, y: my + h * 0.08 },
+    { id: 6, label: 'F', x: w * 0.7, y: h - my - h * 0.08 },
+    { id: 7, label: 'T', x: w - mx, y: h * 0.5 },
+  ];
+}
+
+const edges = [
+  { from: 0, to: 1, w: 2 },
+  { from: 0, to: 2, w: 5 },
+  { from: 1, to: 3, w: 3 },
+  { from: 1, to: 4, w: 7 },
+  { from: 2, to: 4, w: 1 },
+  { from: 3, to: 5, w: 4 },
+  { from: 3, to: 6, w: 6 },
+  { from: 4, to: 6, w: 2 },
+  { from: 5, to: 7, w: 1 },
+  { from: 6, to: 7, w: 3 },
+  { from: 2, to: 3, w: 4 },
+  { from: 4, to: 5, w: 5 },
+];
+
+// True shortest distances from S
+const trueDist = [0, 2, 5, 5, 6, 9, 8, 10];
+
+// Shortest path: S→A→C→E→T (edges by index in edges array)
+// Predecessors: T←E←C←A←S  i.e. path nodes [0,1,3,5,7]
+const shortestPathNodes = [0, 1, 3, 5, 7];
+const shortestPathEdges = [
+  { from: 0, to: 1 }, // S→A
+  { from: 1, to: 3 }, // A→C
+  { from: 3, to: 5 }, // C→E
+  { from: 5, to: 7 }, // E→T
+];
+
+function isLastStep() {
+  return currentStep === phases[currentPhase].steps.length - 1;
+}
+
+// Algorithm states
+const phases = {
+  dijkstra: {
+    label: 'DIJKSTRA — PRIORITY QUEUE EXTRACTION',
+    steps: [
+      { complete: [], frontier: [0], current: 0, relaxed: [], desc: 'Start at S (dist=0). S enters priority queue.' },
+      { complete: [0], frontier: [1, 2], current: 0, relaxed: [{f:0,t:1},{f:0,t:2}], desc: 'Extract S (min). Relax S→A (2), S→B (5). A,B enter queue.' },
+      { complete: [0, 1], frontier: [2, 3, 4], current: 1, relaxed: [{f:1,t:3},{f:1,t:4}], desc: 'Extract A (dist=2, min). Relax A→C (5), A→D (9).' },
+      { complete: [0, 1, 2], frontier: [3, 4], current: 2, relaxed: [{f:2,t:4},{f:2,t:3}], desc: 'Extract B (dist=5). Relax B→D (6 < 9, update!), B→C (9, no update).' },
+      { complete: [0, 1, 2, 3], frontier: [4, 5, 6], current: 3, relaxed: [{f:3,t:5},{f:3,t:6}], desc: 'Extract C (dist=5). Relax C→E (9), C→F (11).' },
+      { complete: [0, 1, 2, 3, 4], frontier: [5, 6], current: 4, relaxed: [{f:4,t:6},{f:4,t:5}], desc: 'Extract D (dist=6). Relax D→F (8 < 11, update!), D→E (11, no update).' },
+      { complete: [0, 1, 2, 3, 4, 6], frontier: [5], current: 6, relaxed: [{f:6,t:7}], desc: 'Extract F (dist=8). Relax F→T (11).' },
+      { complete: [0, 1, 2, 3, 4, 5, 6], frontier: [7], current: 5, relaxed: [{f:5,t:7}], desc: 'Extract E (dist=9). Relax E→T (10 < 11, update!).' },
+      { complete: [0, 1, 2, 3, 4, 5, 6, 7], frontier: [], current: 7, relaxed: [], desc: 'Extract T (dist=10). All vertices complete! Shortest path: S→A→C→E→T = 2+3+4+1 = 10' },
+    ],
+    info: {
+      title: 'Dijkstra\'s Algorithm',
+      how: 'Maintains a <span class="highlight">priority queue</span>. Always extracts the vertex with minimum distance — guaranteeing it\'s finalized.',
+      bottleneck: 'The priority queue forces a <span class="highlight">full sort</span> of vertices by distance → Θ(n log n) minimum.',
+      complexity: { text: 'O(m + n log n)', pct: 85 },
+    }
+  },
+
+  bellman: {
+    label: 'BELLMAN-FORD — EDGE RELAXATION WAVES',
+    steps: [
+      { wave: 0, relaxedEdges: [], dists: [0,Infinity,Infinity,Infinity,Infinity,Infinity,Infinity,Infinity], desc: 'Initialize: dist[S]=0, all others ∞. No sorting needed.' },
+      { wave: 1, relaxedEdges: [0,1], dists: [0,2,5,Infinity,Infinity,Infinity,Infinity,Infinity], desc: 'Wave 1: Relax ALL edges. S→A=2, S→B=5 found.' },
+      { wave: 2, relaxedEdges: [2,3,4,10], dists: [0,2,5,5,6,Infinity,Infinity,Infinity], desc: 'Wave 2: Relax ALL edges again. A→C=5, B→D=6, A→D=9→ B→D=6 wins.' },
+      { wave: 3, relaxedEdges: [5,6,7,11], dists: [0,2,5,5,6,9,8,Infinity], desc: 'Wave 3: C→E=9, D→F=8, C→F=11→ D→F=8 wins.' },
+      { wave: 4, relaxedEdges: [8,9], dists: [0,2,5,5,6,9,8,10], desc: 'Wave 4: E→T=10, F→T=11→ E→T=10 wins. Converged! Shortest path: S→A→C→E→T = 2+3+4+1 = 10' },
+    ],
+    info: {
+      title: 'Bellman-Ford Algorithm',
+      how: 'Relaxes <span class="highlight">all edges</span> in each wave. After k waves, all shortest paths using ≤k edges are found.',
+      bottleneck: 'No sorting needed! But relaxes <span class="highlight">every edge every wave</span> → O(mk) total work.',
+      complexity: { text: 'O(m·k)', pct: 70 },
+    }
+  },
+
+  hybrid: {
+    label: 'BREAKTHROUGH — FRONTIER SHRINKING VIA PIVOTS',
+    steps: [
+      { 
+        frontier: [0], pivots: [], complete: [], bfZone: [], desc: 'Start: S is the source. The frontier contains vertices with estimated distances in [b, B).',
+        phase: 'init'
+      },
+      { 
+        frontier: [1, 2], pivots: [], complete: [0], bfZone: [1, 2], desc: 'Run Bellman-Ford k steps from frontier. Vertices reachable within k hops become complete without sorting.',
+        phase: 'bf'
+      },
+      { 
+        frontier: [1, 2], pivots: [1], complete: [0, 2], bfZone: [3, 4], desc: 'FindPivots: Vertices with large subtrees (≥k nodes) become pivots. Frontier shrinks from |S| to |U|/k.',
+        phase: 'pivot'
+      },
+      { 
+        frontier: [3, 4], pivots: [3], complete: [0, 1, 2], bfZone: [5, 6], desc: 'Recurse: Only pivots enter the next level\'s priority structure. Far fewer vertices to sort → breaks the Θ(n log n) barrier.',
+        phase: 'recurse'
+      },
+      { 
+        frontier: [5, 6], pivots: [6], complete: [0, 1, 2, 3, 4], bfZone: [7], desc: 'Each recursion level reduces frontier by 1/log^Ω(1)(n). Over log(n)/t levels, total work per vertex drops to log^{2/3}(n).',
+        phase: 'recurse'
+      },
+      { 
+        frontier: [7], pivots: [], complete: [0, 1, 2, 3, 4, 5, 6, 7], bfZone: [], desc: 'All vertices complete! O(m·log^{2/3} n). Shortest path: S→A→C→E→T = 2+3+4+1 = 10',
+        phase: 'done'
+      },
+    ],
+    info: {
+      title: 'The Breakthrough (2025)',
+      how: 'Merges both: Use <span class="tooltip-trigger" onclick="openTooltip()">Bellman-Ford as a coarse filter</span> to shrink the frontier, then <span class="highlight">Dijkstra-like</span> recursive calls on pivots only.',
+      bottleneck: 'Frontier shrinks by 1/log^Ω(1)(n) per level → sorting cost drops below n log n.',
+      complexity: { text: 'O(m·log²/³ n)', pct: 55 },
+    }
+  }
+};
+
+let currentPhase = 'dijkstra';
+let currentStep = 0;
+let playing = false;
+let playInterval = null;
+
+// Colors
+const COLORS = {
+  dijkstra: '#f59e0b',
+  bellman: '#06b6d4',
+  hybrid: '#a855f7',
+  complete: '#22c55e',
+  incomplete: '#ef4444',
+  frontier: '#f59e0b',
+  pivot: '#a855f7',
+  bfZone: '#06b6d4',
+  edge: '#1e1e2e',
+  edgeActive: '#f59e0b',
+};
+
+function drawArrow(x1, y1, x2, y2, color, width, alpha, glow) {
+  const nodes = nodePositions();
+  const r = Math.min(W(), H()) * 0.04;
+  const dx = x2 - x1, dy = y2 - y1;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const ux = dx/dist, uy = dy/dist;
+  const sx = x1 + ux * r, sy = y1 + uy * r;
+  const ex = x2 - ux * (r + 8), ey = y2 - uy * (r + 8);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (glow) {
+    ctx.shadowColor = 'rgba(255,255,255,0.5)';
+    ctx.shadowBlur = 12;
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+
+  // Arrowhead
+  const aLen = 8;
+  const aAng = 0.4;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(ex + ux * 8, ey + uy * 8);
+  ctx.lineTo(ex - ux * aLen * Math.cos(aAng) + uy * aLen * Math.sin(aAng), 
+             ey - uy * aLen * Math.cos(aAng) - ux * aLen * Math.sin(aAng));
+  ctx.lineTo(ex - ux * aLen * Math.cos(aAng) - uy * aLen * Math.sin(aAng), 
+             ey - uy * aLen * Math.cos(aAng) + ux * aLen * Math.sin(aAng));
+  ctx.fill();
+  ctx.restore();
+}
+
+function draw() {
+  const w = W(), h = H();
+  const nodes = nodePositions();
+  const phase = phases[currentPhase];
+  const step = phase.steps[currentStep];
+  const r = Math.min(w, h) * 0.04;
+  const accentColor = COLORS[currentPhase] || COLORS.dijkstra;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Draw edges
+  edges.forEach((e, idx) => {
+    const n1 = nodes[e.from], n2 = nodes[e.to];
+    let eColor = COLORS.edge;
+    let eWidth = 1;
+    let eAlpha = 0.4;
+
+    // Check if this edge is on the shortest path (for last step highlighting)
+    const onShortestPath = isLastStep() && shortestPathEdges.some(sp => sp.from === e.from && sp.to === e.to);
+
+    if (onShortestPath) {
+      eColor = '#fff';
+      eWidth = 3.5;
+      eAlpha = 1;
+    } else if (currentPhase === 'dijkstra') {
+      const isRelaxed = step.relaxed && step.relaxed.some(r => r.f === e.from && r.t === e.to);
+      if (isRelaxed) { eColor = COLORS.edgeActive; eWidth = 2.5; eAlpha = 1; }
+      else if (step.complete.includes(e.from)) { eColor = COLORS.complete; eAlpha = 0.5; eWidth = 1.5; }
+    } else if (currentPhase === 'bellman') {
+      const isRelaxed = step.relaxedEdges && step.relaxedEdges.includes(idx);
+      if (isRelaxed) { eColor = COLORS.bellman; eWidth = 2.5; eAlpha = 1; }
+    } else if (currentPhase === 'hybrid') {
+      if (step.complete.includes(e.from) && step.complete.includes(e.to)) {
+        eColor = COLORS.complete; eAlpha = 0.5; eWidth = 1.5;
+      }
+      if (step.bfZone && step.bfZone.includes(e.to) && (step.frontier.includes(e.from) || step.complete.includes(e.from))) {
+        eColor = COLORS.bfZone; eWidth = 2; eAlpha = 0.8;
+      }
+    }
+
+    drawArrow(n1.x, n1.y, n2.x, n2.y, eColor, eWidth, eAlpha, onShortestPath);
+
+    // Weight label
+    const mx = (n1.x + n2.x) / 2, my = (n1.y + n2.y) / 2;
+    const perpX = -(n2.y - n1.y), perpY = n2.x - n1.x;
+    const pLen = Math.sqrt(perpX*perpX + perpY*perpY);
+    const off = 12;
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = '#888';
+    ctx.font = '500 10px "JetBrains Mono"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e.w, mx + (perpX/pLen)*off, my + (perpY/pLen)*off);
+    ctx.restore();
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    let fillColor = '#1a1a2e';
+    let strokeColor = '#333';
+    let textColor = var_muted = '#888';
+    let glowColor = null;
+    let showDist = false;
+    let distVal = '';
+
+    if (currentPhase === 'dijkstra') {
+      if (step.complete.includes(n.id)) {
+        fillColor = '#0a2a0a'; strokeColor = COLORS.complete; textColor = COLORS.complete;
+        glowColor = 'rgba(34,197,94,0.2)';
+        showDist = true; distVal = trueDist[n.id];
+      } else if (step.frontier && step.frontier.includes(n.id)) {
+        fillColor = '#2a1a0a'; strokeColor = COLORS.frontier; textColor = COLORS.frontier;
+        glowColor = 'rgba(245,158,11,0.15)';
+      }
+      if (n.id === step.current && !step.complete.includes(n.id)) {
+        fillColor = '#2a2a0a'; strokeColor = '#fff'; textColor = '#fff';
+        glowColor = 'rgba(255,255,255,0.15)';
+      }
+    } else if (currentPhase === 'bellman') {
+      const d = step.dists[n.id];
+      if (d < Infinity) {
+        fillColor = '#0a1a2a'; strokeColor = COLORS.bellman; textColor = COLORS.bellman;
+        glowColor = 'rgba(6,182,212,0.15)';
+        showDist = true; distVal = d;
+      }
+      if (step.wave > 0) {
+        const prevDists = phases.bellman.steps[currentStep - 1]?.dists;
+        if (prevDists && prevDists[n.id] !== d) {
+          glowColor = 'rgba(6,182,212,0.4)';
+          strokeColor = '#fff';
+        }
+      }
+    } else if (currentPhase === 'hybrid') {
+      if (step.complete.includes(n.id)) {
+        fillColor = '#0a2a0a'; strokeColor = COLORS.complete; textColor = COLORS.complete;
+        glowColor = 'rgba(34,197,94,0.2)';
+      }
+      if (step.frontier && step.frontier.includes(n.id)) {
+        fillColor = '#2a1a0a'; strokeColor = COLORS.frontier; textColor = COLORS.frontier;
+        glowColor = 'rgba(245,158,11,0.2)';
+      }
+      if (step.pivots && step.pivots.includes(n.id)) {
+        fillColor = '#1a0a2a'; strokeColor = COLORS.pivot; textColor = COLORS.pivot;
+        glowColor = 'rgba(168,85,247,0.3)';
+      }
+      if (step.bfZone && step.bfZone.includes(n.id)) {
+        fillColor = '#0a1a2a'; strokeColor = COLORS.bfZone; textColor = COLORS.bfZone;
+        glowColor = 'rgba(6,182,212,0.2)';
+      }
+    }
+
+    // Override: highlight shortest path nodes on last step
+    const onSPNode = isLastStep() && shortestPathNodes.includes(n.id);
+    if (onSPNode) {
+      fillColor = '#1a1a2e'; strokeColor = '#fff'; textColor = '#fff';
+      glowColor = 'rgba(255,255,255,0.25)';
+      showDist = true; distVal = trueDist[n.id];
+    }
+
+    // Glow
+    if (glowColor) {
+      ctx.save();
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = glowColor;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = strokeColor;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = textColor;
+    ctx.font = '700 13px "JetBrains Mono"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.label, n.x, n.y - (showDist ? 4 : 0));
+
+    if (showDist) {
+      ctx.font = '300 9px "JetBrains Mono"';
+      ctx.fillStyle = textColor;
+      ctx.globalAlpha = 0.7;
+      ctx.fillText(distVal, n.x, n.y + 10);
+      ctx.globalAlpha = 1;
+    }
+  });
+}
+
+function updateInfo() {
+  const phase = phases[currentPhase];
+  const step = phase.steps[currentStep];
+  const info = phase.info;
+  const accentColor = COLORS[currentPhase];
+
+  document.getElementById('canvasLabel').textContent = phase.label;
+  document.getElementById('stepLabel').textContent = `Step ${currentStep} / ${phase.steps.length - 1}`;
+
+  let legendHTML = '';
+  if (currentPhase === 'dijkstra') {
+    legendHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.complete}"></div>Complete</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.frontier}"></div>In queue</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fff"></div>Extracting</div>
+    `;
+  } else if (currentPhase === 'bellman') {
+    legendHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.bellman}"></div>Reached</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fff;border:1px solid ${COLORS.bellman}"></div>Updated this wave</div>
+    `;
+  } else {
+    legendHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.complete}"></div>Complete</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.frontier}"></div>Frontier</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.pivot}"></div>Pivot</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${COLORS.bfZone}"></div>BF zone</div>
+    `;
+  }
+
+  // Add shortest path legend on last step
+  if (isLastStep()) {
+    legendHTML += `<div class="legend-item"><div class="legend-dot" style="background:#fff"></div>Shortest path</div>`;
+  }
+
+  document.getElementById('infoPanel').innerHTML = `
+    <div class="info-card fade-enter">
+      <h3 style="color:${accentColor}">${info.title}</h3>
+      <p>${info.how}</p>
+      <div style="margin-top:0.8rem">
+        <p style="font-size:0.65rem;color:${accentColor};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.3rem">Bottleneck</p>
+        <p>${info.bottleneck}</p>
+      </div>
+      <div class="complexity-bar">
+        <div class="bar"><div class="bar-fill" style="width:${info.complexity.pct}%;background:${accentColor}"></div></div>
+        <div class="label">${info.complexity.text}</div>
+      </div>
+    </div>
+    <div class="info-card fade-enter" style="border-left:2px solid ${accentColor}">
+      <p style="line-height:1.8">${step.desc}</p>
+    </div>
+    <div class="info-card fade-enter">
+      <div class="legend">${legendHTML}</div>
+    </div>
+  `;
+}
+
+function setPhase(phase) {
+  stopPlay();
+  currentPhase = phase;
+  currentStep = 0;
+  document.querySelectorAll('.phase-btn').forEach(b => b.classList.toggle('active', b.dataset.phase === phase));
+  updateInfo();
+  draw();
+}
+
+function nextStep() {
+  const max = phases[currentPhase].steps.length - 1;
+  if (currentStep < max) { currentStep++; updateInfo(); draw(); }
+  else stopPlay();
+}
+
+function prevStep() {
+  if (currentStep > 0) { currentStep--; updateInfo(); draw(); }
+}
+
+function resetStep() {
+  stopPlay();
+  currentStep = 0;
+  updateInfo();
+  draw();
+}
+
+function togglePlay() {
+  if (playing) { stopPlay(); return; }
+  playing = true;
+  document.getElementById('playBtn').textContent = '⏸';
+  playInterval = setInterval(() => {
+    const max = phases[currentPhase].steps.length - 1;
+    if (currentStep >= max) { stopPlay(); return; }
+    nextStep();
+  }, 1200);
+}
+
+function stopPlay() {
+  playing = false;
+  document.getElementById('playBtn').textContent = '▶';
+  clearInterval(playInterval);
+}
+
+// Events
+document.querySelectorAll('.phase-btn').forEach(b => b.addEventListener('click', () => setPhase(b.dataset.phase)));
+document.getElementById('nextBtn').addEventListener('click', nextStep);
+document.getElementById('prevBtn').addEventListener('click', prevStep);
+document.getElementById('resetBtn').addEventListener('click', resetStep);
+document.getElementById('playBtn').addEventListener('click', togglePlay);
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') nextStep();
+  if (e.key === 'ArrowLeft') prevStep();
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+
+// Tooltip popup
+function openTooltip() {
+  document.getElementById('tooltipOverlay').classList.add('visible');
+  document.getElementById('tooltipBF').classList.add('visible');
+}
+
+function closeTooltip() {
+  document.getElementById('tooltipOverlay').classList.remove('visible');
+  document.getElementById('tooltipBF').classList.remove('visible');
+}
+
+document.getElementById('tooltipClose').addEventListener('click', closeTooltip);
+document.getElementById('tooltipOverlay').addEventListener('click', closeTooltip);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeTooltip();
+});
+
+// Init
+updateInfo();
+draw();
+</script>
+</body>
+</html>
