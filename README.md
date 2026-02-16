@@ -5,7 +5,7 @@
 
 ## TL;DR
 
-Dijkstra's algorithm has been the gold standard for shortest path computation since **1959**. This paper presents the **first proven improvement** for directed graphs with real non-negative edge weights — a deterministic **O(m log²/³ n)** algorithm that breaks Dijkstra's O(m + n log n) bound on sparse graphs.
+Dijkstra's algorithm has been the gold standard for shortest path computation since **1959**. This paper presents the **first proven improvement** for directed graphs with real non-negative edge weights since 1987 (Dijkstra + Fibonacci heap), a deterministic **O(m log²/³ n)** algorithm that breaks Dijkstra's O(m + n log n) bound on sparse graphs.
 
 **Dijkstra is not optimal for SSSP.**
 
